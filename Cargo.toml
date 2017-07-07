@@ -1,0 +1,18 @@
+[package]
+name = "rustup-toolchain-proxy"
+version = "0.1.0"
+authors = ["Philipp Keller <philipp.keller@gmail.com>"]
+
+[dependencies]
+
+[lib]
+name = "proxy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cargo"
+path = "src/cargo.rs"
+
+[[bin]]
+name = "rustc"
+path = "src/rustc.rs"
