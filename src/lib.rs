@@ -5,14 +5,18 @@ use std::io::{Read, Write};
 use std::{io, str};
 
 fn pass_through<T: Read, U:Write>(mut reader:T, mut writer:U) {
-    let mut buffer = [0u8; 256];
+    let mut buffer = [0u8; 128];
     loop {
         match reader.read(&mut buffer) {
+            Ok(0) => {
+                // eof
+                break
+            }
             Ok(n) if n > 0 => {
                 // linux has \n as line ending, windows \r\n -> needs some copy/replace action
                 let s:String = str::from_utf8(&buffer[0..n]).expect("utf-8 error").to_string();
                 writer.write(s.replace("\n", "\r\n").as_bytes()).expect("cannot write line");
-            }
+            },
             _ => {}
         }
     }
@@ -26,13 +30,15 @@ pub fn proxy(command: &str) {
         .stdout(process::Stdio::piped()).stderr(process::Stdio::piped()).spawn().expect(&format!("could not execute {} {}", &command, &args));
     let stdout = process.stdout.take().unwrap();
     let stderr = process.stderr.take().unwrap();
-    thread::spawn(move || {
+    let t_out = thread::spawn(move || {
         pass_through(stdout, io::stdout());
     });
-    thread::spawn(move || {
+    let t_err = thread::spawn(move || {
         pass_through(stderr, io::stderr());
     });
 
     let exit = process.wait().expect("could not wait until finished..");
+    t_out.join().expect("could not join thread reading/writing from stdout");
+    t_err.join().expect("could not join thread reading/writing from stderr");
     process::exit(exit.code().expect("no exit code"));
 }

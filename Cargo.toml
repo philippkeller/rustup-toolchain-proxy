@@ -16,3 +16,7 @@ path = "src/cargo.rs"
 [[bin]]
 name = "rustc"
 path = "src/rustc.rs"
+
+[[bin]]
+name = "rustdoc"
+path = "src/rustdoc.rs"
