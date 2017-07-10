@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Philipp Keller <philipp.keller@gmail.com>"]
 
 [dependencies]
+regex = "0.2"
 
 [lib]
 name = "proxy"
