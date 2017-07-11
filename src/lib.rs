@@ -26,6 +26,10 @@ fn pass_through<T: Read, U:Write>(mut reader:T, mut writer:U) {
     }
 }
 
+// TODO: there's an error "cannot find stdlib in sysroot" which is probably caused by
+// ` rustc --print sysroot` printing a linux path, currently
+// `/home/philipp/.rustup/toolchains/stable-x86_64-unknown-linux-gnu`
+
 fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
     let mut buffer = [0u8; 128];
     let mut res = String::with_capacity(8192);
@@ -43,12 +47,30 @@ fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
             _ => {}
         }
     }
-    let re = Regex::new("/home/philipp/.cargo/([^\"]+)").unwrap();
-    let replaced = re.replace_all(&res, |caps: &Captures| {
-        format!("C:\\Users\\lcl40026\\.cargo\\{}", caps[1].replace("/", "\\"))
-    });
+    // TODO: find out username from environment
+    // TODO: doesn't that need to point to the WSL path instead?
+    // from: "/home/philipp/..."
+    // to:   "C:\\Users\\lcl40026\\.."
+    let re = Regex::new("\"/home/[^/]+/.cargo/([^\"]+)\"").unwrap();
+    res = re.replace_all(&res, |caps: &Captures| {
+        let path = "\"C:/Users/lcl40026/AppData/Local/lxss/home/philipp/.cargo/".to_string() + &caps[1] + "\"";
+        path.replace("/", "\\\\")
+    }).to_string();
+    // from: "/mnt/c/..."
+    // to:   "C:\\.."
+    let re = Regex::new("\"/mnt/([^\"]+)\"").unwrap();
+    res = re.replace_all(&res, |caps: &Captures| {
+        format!("\"{}:\\\\{}\"", caps[1][0..1].to_uppercase(), &caps[1][1..].replace("/", "\\\\"))
+    }).to_string();
+    // from: path+file:///mnt/c/ProgramData/oss/rexpect)
+    // to:   path+file:///C:/ProgramData..
+    let re = Regex::new("path\\+file:///mnt/([^\"]+)").unwrap();
+    res = re.replace_all(&res, |caps: &Captures| {
+        format!("path+file:///{}:{}", caps[1][0..1].to_uppercase(), &caps[1][1..])
+    }).to_string();
 
-    writer.write_all(replaced.as_bytes()).expect("cannot write line");
+
+    writer.write_all(res.as_bytes()).expect("cannot write line");
 }
 
 pub fn proxy(command: &str) {
