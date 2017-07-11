@@ -26,10 +26,6 @@ fn pass_through<T: Read, U:Write>(mut reader:T, mut writer:U) {
     }
 }
 
-// TODO: there's an error "cannot find stdlib in sysroot" which is probably caused by
-// ` rustc --print sysroot` printing a linux path, currently
-// `/home/philipp/.rustup/toolchains/stable-x86_64-unknown-linux-gnu`
-
 fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
     let mut buffer = [0u8; 128];
     let mut res = String::with_capacity(8192);
@@ -73,13 +69,28 @@ fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
     writer.write_all(res.as_bytes()).expect("cannot write line");
 }
 
+//  make `rustc --print sysroot` print the right path:
+// from: /home/philipp/.rustup/toolchains/stable-x86_64-unknown-linux-gnu
+// to: C:\\Users\\lcl40026\\.rustup\\...
+fn replace_sysroot<T: Read, U:Write>(mut reader:T, mut writer:U) {
+    let mut res = String::new();
+    reader.read_to_string(&mut res).expect("cannot read from executable. Probably utf8 error");
+    let re = Regex::new("/home/[^/]+/(.*)").unwrap();
+    res = re.replace(&res, |caps: &Captures| {
+        format!("C:/Users/lcl40026/{}", &caps[1]).replace("/", "\\\\")
+    }).to_string();
+    writer.write_all(res.as_bytes()).expect("cannot write line");
+}
+
 pub fn proxy(command: &str) {
-    let mut arguments:Vec<String> = env::args().collect::<Vec<String>>();
+    let mut arguments: Vec<String> = env::args().collect::<Vec<String>>();
     arguments[0] = "~/.cargo/bin/".to_string() + command;
     let args = arguments.join(" ");
 
     let stdout_fn = if command == "cargo" && arguments.len() >= 2 && arguments[1] == "metadata" {
         replace_paths
+    } else if command == "rustc" && arguments.len() == 3 && arguments[1] == "--print" && arguments[2] == "sysroot" {
+        replace_sysroot
     } else {
         pass_through
     };
