@@ -1,5 +1,7 @@
 The missing link to use rust from WSL (Linux Susbsystem for Windows) from IntelliJ (and potentially also other IDEs) to achieve a cross compiling environment on Windows without the hassle of setting up an actual cross compiler (because the latter is depending on C cross toolchains which are currently all outdated for Windows->Linux and generally not recommended for real usage).
 
+Caution: this is a hack really and is in desperate need of a more proper solution. But as long as it works.. why does it matter :)
+
 # Installation
 
 ```
