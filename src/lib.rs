@@ -55,7 +55,7 @@ fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
         }
     }
     // from: "/home/linux_user/..."
-    // to:   "C:\\Users\\windows_user\\.."
+    // to:   "C:\\Users\\windows_user\\AppData\\Local\lxss\\home\\linux_user\.."
     let re = Regex::new("\"/home/([^/]+)/.cargo/([^\"]+)\"").unwrap();
     res = re.replace_all(&res, |caps: &Captures| {
         format!("\"{}/AppData/Local/lxss/home/{}/.cargo/{}\"", HOME_DIR.as_str(), &caps[1], &caps[2]).replace("/", "\\\\")
