@@ -2,6 +2,7 @@
 name = "rustup-toolchain-proxy"
 version = "0.1.0"
 dependencies = [
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

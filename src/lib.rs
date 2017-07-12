@@ -5,8 +5,18 @@ use std::io::{Read, Write};
 use std::{io, str};
 
 extern crate regex;
+#[macro_use]
+extern crate lazy_static;
 
 use regex::{Regex, Captures};
+
+lazy_static! {
+    /// home dir with forward slashes without trailing slash, e.g. C:/Users/hans
+    static ref HOME_DIR: String = {
+        let home_dir = env::home_dir().expect("could not retrieve HOME var").to_str().expect("hm. utf8 error..?").to_string();
+        home_dir.replace("\\", "/")
+    };
+}
 
 fn pass_through<T: Read, U:Write>(mut reader:T, mut writer:U) {
     let mut buffer = [0u8; 128];
@@ -26,6 +36,7 @@ fn pass_through<T: Read, U:Write>(mut reader:T, mut writer:U) {
     }
 }
 
+/// translate linux paths to windows paths
 fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
     let mut buffer = [0u8; 128];
     let mut res = String::with_capacity(8192);
@@ -43,20 +54,17 @@ fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
             _ => {}
         }
     }
-    // TODO: find out username from environment
-    // TODO: doesn't that need to point to the WSL path instead?
-    // from: "/home/philipp/..."
-    // to:   "C:\\Users\\lcl40026\\.."
-    let re = Regex::new("\"/home/[^/]+/.cargo/([^\"]+)\"").unwrap();
+    // from: "/home/linux_user/..."
+    // to:   "C:\\Users\\windows_user\\.."
+    let re = Regex::new("\"/home/([^/]+)/.cargo/([^\"]+)\"").unwrap();
     res = re.replace_all(&res, |caps: &Captures| {
-        let path = "\"C:/Users/lcl40026/AppData/Local/lxss/home/philipp/.cargo/".to_string() + &caps[1] + "\"";
-        path.replace("/", "\\\\")
+        format!("\"{}/AppData/Local/lxss/home/{}/.cargo/{}\"", HOME_DIR.as_str(), &caps[1], &caps[2]).replace("/", "\\\\")
     }).to_string();
     // from: "/mnt/c/..."
     // to:   "C:\\.."
-    let re = Regex::new("\"/mnt/([^\"]+)\"").unwrap();
+    let re = Regex::new("\"/mnt/([^/]+)/([^\"]+)\"").unwrap();
     res = re.replace_all(&res, |caps: &Captures| {
-        format!("\"{}:\\\\{}\"", caps[1][0..1].to_uppercase(), &caps[1][1..].replace("/", "\\\\"))
+        format!("\"{}:/{}\"", caps[1].to_uppercase(), &caps[2]).replace("/", "\\\\")
     }).to_string();
     // from: path+file:///mnt/c/ProgramData/oss/rexpect)
     // to:   path+file:///C:/ProgramData..
@@ -70,14 +78,14 @@ fn replace_paths<T: Read, U:Write>(mut reader:T, mut writer:U) {
 }
 
 //  make `rustc --print sysroot` print the right path:
-// from: /home/philipp/.rustup/toolchains/stable-x86_64-unknown-linux-gnu
-// to: C:\\Users\\lcl40026\\.rustup\\...
+// from: /home/linux_user/.rustup/toolchains/stable-x86_64-unknown-linux-gnu
+// to: C:\\Users\\windows_user\\.rustup\\...
 fn replace_sysroot<T: Read, U:Write>(mut reader:T, mut writer:U) {
     let mut res = String::new();
     reader.read_to_string(&mut res).expect("cannot read from executable. Probably utf8 error");
     let re = Regex::new("/home/[^/]+/(.*)").unwrap();
     res = re.replace(&res, |caps: &Captures| {
-        format!("C:/Users/lcl40026/{}", &caps[1]).replace("/", "\\\\")
+        format!("{}/{}", HOME_DIR.as_str(), &caps[1]).replace("/", "\\\\")
     }).to_string();
     writer.write_all(res.as_bytes()).expect("cannot write line");
 }
@@ -94,6 +102,7 @@ pub fn proxy(command: &str) {
     } else {
         pass_through
     };
+
     let mut process = process::Command::new("bash.exe").arg("-ci").arg(&args)
         .stdout(process::Stdio::piped()).stderr(process::Stdio::piped()).spawn().expect(&format!("could not execute {} {}", &command, &args));
     let stdout = process.stdout.take().unwrap();
